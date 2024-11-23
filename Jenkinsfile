@@ -4,6 +4,9 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'trongpham99/server_golang'
         DOCKER_TAG = 'latest'
+        PROD_SERVER = 'ec2-54-255-237-49.ap-southeast-1.compute.amazonaws.com'
+        SSH_KEY = 'key-ductrong-pham.pem'
+        PROD_USER = 'ubuntu'
     }
 
     stages {
@@ -39,13 +42,38 @@ pipeline {
 
         stage('Deploy Golang to DEV') {
             steps {
-                echo 'Deploying to DEV...'
-                sh 'docker image pull trongpham99/server_golang:latest'
-                sh 'docker container stop server-golang || echo "this container does not exist"'
-                sh 'docker network create dev || echo "this network exists"'
-                sh 'echo y | docker container prune '
+                script {
+                    echo 'Clearing all images and containers...'
+                    sh '''
+                        docker container stop $(docker container ls -q) || echo "No containers to stop"
+                        docker container prune -f
+                        docker image prune -a -f
+                    '''
+                    
+                    echo 'Deploying to DEV environment...'
+                    sh '''
+                        docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker network create dev || echo "Network already exists"
+                        docker container run -d --rm --name server-golang -p 4000:4000 --network dev ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    '''
+                }
+            }
+        }
 
-                sh 'docker container run -d --rm --name server-golang -p 4000:4000 --network dev trongpham99/server_golang:latest'
+        stage('Deploy to Production on AWS') {
+            steps {
+                script {
+                    echo 'Deploying to Production...'
+                    sh '''
+                        ssh -i "${SSH_KEY}" ${PROD_USER}@${PROD_SERVER} << EOF
+                            docker container stop $(docker container ls -q) || echo "No containers to stop"
+                            docker container prune -f
+                            docker image prune -a -f
+                            docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+                            docker container run -d --rm --name server-golang -p 4000:4000 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        EOF
+                    '''
+                }
             }
         }
     }
