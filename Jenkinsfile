@@ -64,7 +64,7 @@ pipeline {
             steps {
                 script {
                     echo 'Deploying to Production...'
-                    sshagent(['aws-ssh-key']) { // Use the Jenkins credential ID
+                    sshagent(['aws-ssh-key']) {
                         sh '''
                             ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_SERVER} << EOF
                                 docker container stop server-golang || echo "No container to stop"
@@ -72,7 +72,6 @@ pipeline {
                                 docker image rm ${DOCKER_IMAGE}:${DOCKER_TAG} || echo "No image to remove"
                                 docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                                 docker container run -d --rm --name server-golang -p 4000:4000 ${DOCKER_IMAGE}:${DOCKER_TAG}
-                            EOF
                         '''
                     }
                 }
