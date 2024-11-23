@@ -5,7 +5,6 @@ pipeline {
         DOCKER_IMAGE = 'trongpham99/server_golang'
         DOCKER_TAG = 'latest'
         PROD_SERVER = 'ec2-54-255-237-49.ap-southeast-1.compute.amazonaws.com'
-        SSH_KEY = 'key-ductrong-pham.pem'
         PROD_USER = 'ubuntu'
     }
 
@@ -43,7 +42,7 @@ pipeline {
         stage('Deploy Golang to DEV') {
             steps {
                 script {
-                    echo 'Clearing all images and containers...'
+                    echo 'Clearing server_golang-related images and containers...'
                     sh '''
                         docker container stop server-golang || echo "No container named server-golang to stop"
                         docker container rm server-golang || echo "No container named server-golang to remove"
@@ -64,15 +63,17 @@ pipeline {
             steps {
                 script {
                     echo 'Deploying to Production...'
-                    sh '''
-                        ssh -i "${SSH_KEY}" ${PROD_USER}@${PROD_SERVER} << EOF
-                            docker container stop $(docker container ls -q) || echo "No containers to stop"
-                            docker container prune -f
-                            docker image prune -a -f
-                            docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
-                            docker container run -d --rm --name server-golang -p 4000:4000 ${DOCKER_IMAGE}:${DOCKER_TAG}
-                        EOF
-                    '''
+                    sshagent(['aws-ssh-key']) { // Use the Jenkins credential ID
+                        sh '''
+                            ssh -o StrictHostKeyChecking=no ${PROD_USER}@${PROD_SERVER} << EOF
+                                docker container stop server-golang || echo "No container to stop"
+                                docker container rm server-golang || echo "No container to remove"
+                                docker image rm ${DOCKER_IMAGE}:${DOCKER_TAG} || echo "No image to remove"
+                                docker image pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+                                docker container run -d --rm --name server-golang -p 4000:4000 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                            EOF
+                        '''
+                    }
                 }
             }
         }
