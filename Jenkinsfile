@@ -45,9 +45,9 @@ pipeline {
                 script {
                     echo 'Clearing all images and containers...'
                     sh '''
-                        docker container stop $(docker container ls -q) || echo "No containers to stop"
-                        docker container prune -f
-                        docker image prune -a -f
+                        docker container stop server-golang || echo "No container named server-golang to stop"
+                        docker container rm server-golang || echo "No container named server-golang to remove"
+                        docker image rm ${DOCKER_IMAGE}:${DOCKER_TAG} || echo "No image ${DOCKER_IMAGE}:${DOCKER_TAG} to remove"
                     '''
                     
                     echo 'Deploying to DEV environment...'
